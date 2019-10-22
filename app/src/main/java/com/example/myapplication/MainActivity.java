@@ -57,7 +57,8 @@ import interfaces.heweather.com.interfacesmodule.*;
 
 public class MainActivity extends AppCompatActivity {
 
-    MyTimeBroadCast myTimeBroadCast;
+    private MyTimeBroadCast myTimeBroadCast;
+    private Intent timeService;
 
     private TextView dateTv;
     private TextView locationTv;
@@ -117,14 +118,15 @@ public class MainActivity extends AppCompatActivity {
         heWeatherInit();
         //  各种控件初始化
         viewInit();
+        startMyTimeBroadCast();
+        startTimeService();
+
 
         //  启动自动更新服务
 //        Intent intent = new Intent(this, UpdateWeatherService.class);
 //        startService(intent);
         //  启动更新时间服务，作为例子学习
-        //  暂时设置成了每隔30min更新一次当前天气内容
-        Intent timeService = new Intent(this, UpdateTimeService.class);
-        startService(timeService);
+
         //  baiduAPI
 //        mLocationClient = new LocationClient(getApplicationContext());
 //        mLocationClient.registerLocationListener(new MyLocationListener());
@@ -134,12 +136,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         Log.i(TAG, "onStart: execute");
-        myTimeBroadCast = new MyTimeBroadCast();
-        IntentFilter filter1 = new IntentFilter();
-        filter1.addAction("TIME_CHANGED_ACTION");
-        registerReceiver(myTimeBroadCast, filter1);
 
-        weatherInfoInit();
+        getWeatherInfo();
         Log.i(TAG, "onCreate: currentcounty is "+currentCounty);
 
         updateWeather(currentWeatherId);
@@ -147,66 +145,40 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void weatherInfoInit(){
+    private void startTimeService(){
+        timeService = new Intent(this, UpdateTimeService.class);
+        startService(timeService);
+    }
+
+    private void startMyTimeBroadCast(){
+        myTimeBroadCast = new MyTimeBroadCast();
+        IntentFilter filter1 = new IntentFilter();
+        filter1.addAction("TIME_CHANGED_ACTION");
+        registerReceiver(myTimeBroadCast, filter1);
+    }
+
+    private void getWeatherInfo(){
         //  从存储的文件中读取
         pref = getSharedPreferences("last_weather", Context.MODE_PRIVATE);
         currentWeatherId = pref.getString("last_weather_id", DEF_WEATHERID);
         currentCity = pref.getString("last_city", DEF_CITY);
         currentCounty = pref.getString("last_county", DEF_COUNTY);
-        Log.i(TAG, "weatherInfoInit: 读取成功");
+        Log.i(TAG, "getWeatherInfo: 读取成功");
 
     }
 
-    private void informationStorage(){
+    private void setWeatherInfo(){
         //  存储一下信息
-    
         editor = getSharedPreferences("last_weather", Context.MODE_PRIVATE).edit();
         editor.putString("last_weather_id", currentWeatherId);
         editor.putString("last_city", currentCity);
         editor.putString("last_county", currentCounty);
         editor.apply();
 //        editor.commit();
-        Log.i(TAG, "informationStorage: 存储成功");
+        Log.i(TAG, "setWeatherInfo: 存储成功");
     }
 
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-//        super.onActivityResult(requestCode, resultCode, data);
-//        switch (requestCode){
-//            case 1:
-//                if(resultCode==RESULT_OK){
-//                    String returnedData = data.getStringExtra("data_return");
-//                    Log.i(TAG, "onActivityResult: "+returnedData);
-//                    testTv.setText(returnedData);
-//                }
-//                break;
-//            default:
-//        }
-//    }
 
-    private void requestLocation(){
-        mLocationClient.start();
-    }
-
-    //  baiduAPI
-    public class MyLocationListener extends BDAbstractLocationListener {
-
-        @Override
-        public void onReceiveLocation(BDLocation bdLocation) {
-            StringBuilder currentPosition = new StringBuilder();
-            currentPosition.append("纬度：").append(bdLocation.getLatitude()).append("\n");
-            currentPosition.append("经度：").append(bdLocation.getLongitude()).append("\n");
-            currentPosition.append("定位方式：");
-            if(bdLocation.getLocType()==BDLocation.TypeGpsLocation){
-                //  GPS定位
-                currentPosition.append("GPS");
-            } else if(bdLocation.getLocType()==BDLocation.TypeNetWorkLocation){
-                //  网络定位
-                currentPosition.append("网络");
-            }
-            testTv.setText(currentPosition);
-        }
-    }
 
     //  每30分接收一次广播，进行一次天气更新。
     public class MyTimeBroadCast extends BroadcastReceiver{
@@ -218,17 +190,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-    private void updateTime() {
-        Date date = new Date();
 
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd");
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-
-        String dateStr = dateFormat.format(date);
-        String timeStr = timeFormat.format(date);
-
-        testTv.setText(timeStr);//显示出时间
-    }
 
     private void heWeatherInit(){
         //  和风天气api初始化
@@ -296,20 +258,21 @@ public class MainActivity extends AppCompatActivity {
         //  获取近期天气
         requestWeatherDailyBySDK(cityId);
         //  设置日期和星期和地理位置
-
-        dateTv.setText(getFormatDate());
-        weekdayTv.setText(getWeekday());
-        locationTv.setText(currentCity+" · "+currentCounty);
-
-
+        setBasicInfo();
         //  刷新完之后要停止srl的刷新图标
         refreshSrl.setRefreshing(false);
 
         //  存储信息
-        informationStorage();
+        setWeatherInfo();
 
         Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
 
+    }
+
+    private void setBasicInfo(){
+        dateTv.setText(getFormatDate());
+        weekdayTv.setText(getWeekday());
+        locationTv.setText(currentCity+" · "+currentCounty);
     }
 
 
@@ -492,6 +455,59 @@ public class MainActivity extends AppCompatActivity {
                 return null;
         }
         
+    }
+
+    private void updateTime() {
+        Date date = new Date();
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+
+        String dateStr = dateFormat.format(date);
+        String timeStr = timeFormat.format(date);
+
+        testTv.setText(timeStr);//显示出时间
+    }
+
+    //  接受活动的返回消息
+
+//    @Override
+//    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
+//        switch (requestCode){
+//            case 1:
+//                if(resultCode==RESULT_OK){
+//                    String returnedData = data.getStringExtra("data_return");
+//                    Log.i(TAG, "onActivityResult: "+returnedData);
+//                    testTv.setText(returnedData);
+//                }
+//                break;
+//            default:
+//        }
+//    }
+
+    private void requestLocation(){
+        mLocationClient.start();
+    }
+
+    //  baiduAPI
+    public class MyLocationListener extends BDAbstractLocationListener {
+
+        @Override
+        public void onReceiveLocation(BDLocation bdLocation) {
+            StringBuilder currentPosition = new StringBuilder();
+            currentPosition.append("纬度：").append(bdLocation.getLatitude()).append("\n");
+            currentPosition.append("经度：").append(bdLocation.getLongitude()).append("\n");
+            currentPosition.append("定位方式：");
+            if(bdLocation.getLocType()==BDLocation.TypeGpsLocation){
+                //  GPS定位
+                currentPosition.append("GPS");
+            } else if(bdLocation.getLocType()==BDLocation.TypeNetWorkLocation){
+                //  网络定位
+                currentPosition.append("网络");
+            }
+            testTv.setText(currentPosition);
+        }
     }
 
 

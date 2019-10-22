@@ -6,11 +6,20 @@ public class NowWeather {
     private String condTxt;
     private String temp;
 
-    public NowWeather(String condCode, String condTxt, String temp) {
+
+
+    private String loc;
+
+    public NowWeather(){
+
+    }
+    public NowWeather(String condCode, String condTxt, String temp, String loc) {
         this.condCode = condCode;
         this.condTxt = condTxt;
         this.temp = temp;
+        this.loc = loc;
     }
+
 
     public String getCondCode() {
         return condCode;
@@ -34,5 +43,13 @@ public class NowWeather {
 
     public void setTemp(String temp) {
         this.temp = temp;
+    }
+
+    public String getLoc() {
+        return loc;
+    }
+
+    public void setLoc(String loc) {
+        this.loc = loc;
     }
 }
