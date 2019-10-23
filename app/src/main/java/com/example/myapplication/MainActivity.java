@@ -84,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView testTv;
 
-    private FloatingActionButton refreshFab;
+//    private FloatingActionButton refreshFab;
 
 //    private Weather myWeather;
 
@@ -107,6 +107,11 @@ public class MainActivity extends AppCompatActivity {
     //  持久化存储文件
     private SharedPreferences pref;
     private SharedPreferences.Editor editor;
+
+    //  消息标识符
+    public static final int UPDATE_NOW = 1;
+    public static final int UPDATE_DAILY = 2;
+    public static final int[] MESSAGE_SYMBOLS = {UPDATE_NOW, UPDATE_DAILY};
 
     //  baiduAPI的内容
     public LocationClient mLocationClient;
@@ -140,9 +145,11 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         Log.i(TAG, "onStart: execute");
 
+        //  读取上一次存储的城市信息
         getWeatherInfo();
         Log.i(TAG, "onCreate: currentcounty is "+currentCounty);
 
+        //  更新天气信息
         updateWeather(currentWeatherId);
         super.onStart();
     }
@@ -195,12 +202,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             updateWeather(currentWeatherId);
-//            requestWeatherNowBySDK(currentWeatherId);
         }
     }
-
-
-
 
     private void viewInit(){
         dateTv = findViewById(R.id.tv_demo_date);
@@ -234,13 +237,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        refreshFab = findViewById(R.id.fab_demo_refresh);
+//        refreshFab = findViewById(R.id.fab_demo_refresh);
     }
-
-    public static final int UPDATE_NOW = 1;
-    public static final int UPDATE_DAILY = 2;
-    public static final int[] MESSAGE_SYMBOLS = {UPDATE_NOW, UPDATE_DAILY};
-
 
     //  接收消息
     private Handler handler = new Handler(){
@@ -304,14 +302,9 @@ public class MainActivity extends AppCompatActivity {
     //  更新日常天气的UI内容
     private void setDailyWeatherInfo(DailyWeather dailyWeather){
         tempTv.setText(dailyWeather.getTemp());
-        tempTv.setTextColor(Color.WHITE);
         weatherTv.setText(dailyWeather.getCondTxtD());
-        weatherTv.setTextColor(Color.WHITE);
         windTv.setText(dailyWeather.getWind());
-        windTv.setTextColor(Color.WHITE);
     }
-
-
 
 //    private void updateTime() {
 //        Date date = new Date();
