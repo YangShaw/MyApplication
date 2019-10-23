@@ -1,6 +1,8 @@
 package com.example.myapplication.util;
 
+import android.content.Context;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -11,6 +13,10 @@ import com.example.myapplication.db.Province;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
 public class Utility {
 
@@ -93,5 +99,52 @@ public class Utility {
             }
         }
         return false;
+    }
+
+    //  设置日期
+    public static String getFormatDate(){
+        SimpleDateFormat simpleDateFormat= new SimpleDateFormat("MM/dd\nyyyy");
+        Date date = new Date(System.currentTimeMillis());
+        return simpleDateFormat.format(date);
+    }
+
+
+    //  设置天气图标
+    public static int getResIdByWeatherCode(String weatherCode, Context context){
+        String imgName = "ic_weather_"+weatherCode;
+        int resId = context.getResources().
+                getIdentifier(imgName, "drawable", "com.example.myapplication");
+        return resId;
+    }
+
+
+    //  设置星期
+    public static String getWeekday(){
+        Calendar calendar = Calendar.getInstance();
+        int week = calendar.get(Calendar.DAY_OF_WEEK);
+        return Utility.convertNumToWeekday(week);
+    }
+
+    //  星期和显示内容的映射
+    private static String convertNumToWeekday(int week){
+        switch (week){
+            case 1:
+                return "Sun.";
+            case 2:
+                return "Mon.";
+            case 3:
+                return "Tues.";
+            case 4:
+                return "Wed.";
+            case 5:
+                return "Thus.";
+            case 6:
+                return "Fri.";
+            case 7:
+                return "Sat.";
+            default:
+                return null;
+        }
+
     }
 }

@@ -35,6 +35,7 @@ import com.example.myapplication.service.UpdateTimeService;
 import com.example.myapplication.service.UpdateWeatherService;
 import com.example.myapplication.util.HeWeatherUtil;
 import com.example.myapplication.util.HttpUtil;
+import com.example.myapplication.util.Utility;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 
@@ -61,6 +62,7 @@ import okhttp3.Callback;
 import okhttp3.Response;
 
 import interfaces.heweather.com.interfacesmodule.*;
+import okhttp3.internal.Util;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -109,8 +111,6 @@ public class MainActivity extends AppCompatActivity {
     //  baiduAPI的内容
     public LocationClient mLocationClient;
 
-
-
     //  main activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,17 +122,13 @@ public class MainActivity extends AppCompatActivity {
         Log.i(TAG,"onCreate execute");
 
         //  和风天气初始化
-        heWeatherInit();
+        HeWeatherUtil.heWeatherInit();
         //  各种控件初始化
         viewInit();
+        //  启动广播接收
         startMyTimeBroadCast();
-        startTimeService();
-
-
         //  启动自动更新服务
-//        Intent intent = new Intent(this, UpdateWeatherService.class);
-//        startService(intent);
-        //  启动更新时间服务，作为例子学习
+        startTimeService();
 
         //  baiduAPI
 //        mLocationClient = new LocationClient(getApplicationContext());
@@ -149,8 +145,15 @@ public class MainActivity extends AppCompatActivity {
 
         updateWeather(currentWeatherId);
         super.onStart();
-
     }
+
+    //  停止自动更新服务
+    @Override
+    protected void onDestroy() {
+        stopService(new Intent(MainActivity.this, UpdateWeatherService.class));
+        super.onDestroy();
+    }
+
 
     private void startTimeService(){
         timeService = new Intent(this, UpdateTimeService.class);
@@ -199,14 +202,6 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
-    private void heWeatherInit(){
-        //  和风天气api初始化
-        HeConfig.init("HE1909200100361711", "69f2cb642a1646379bdb680390c377c7");
-        //  免费接口要转换成免费节点
-        HeConfig.switchToFreeServerNode();
-    }
-
     private void viewInit(){
         dateTv = findViewById(R.id.tv_demo_date);
         locationTv = findViewById(R.id.tv_demo_location);
@@ -244,6 +239,7 @@ public class MainActivity extends AppCompatActivity {
 
     public static final int UPDATE_NOW = 1;
     public static final int UPDATE_DAILY = 2;
+    public static final int[] MESSAGE_SYMBOLS = {UPDATE_NOW, UPDATE_DAILY};
 
 
     //  接收消息
@@ -255,7 +251,6 @@ public class MainActivity extends AppCompatActivity {
                     if(msg.obj!=null){
                         NowWeather nowInfo = (NowWeather)msg.obj;
                         Log.i(TAG, "handleMessage: received UPDATE_NOW");
-//                        Log.i(TAG, "handleMessage: "+nowInfo.toString());
                         setNowWeatherInfo(nowInfo);
                     }
                     break;
@@ -280,51 +275,33 @@ public class MainActivity extends AppCompatActivity {
 
     public void updateWeather(final String cityId){
         Log.i(TAG, "updateWeather: update starting");
-        //  获取即时天气
-//        requestWeatherNowBySDK(cityId);
-        final String queryId = cityId;
 
+        //  在子线程中调用联网查找天气信息的方法
         new Thread(new Runnable() {
             @Override
             public void run() {
-                HeWeatherUtil.requestWeather(MainActivity.this, cityId, handler);
+                HeWeatherUtil.requestWeather(MainActivity.this, cityId,
+                        handler, MESSAGE_SYMBOLS);
             }
         }).start();
-
-//        setNowWeatherInfo(nowWeather);
-//        //  获取近期天气
-//        requestWeatherDailyBySDK(cityId);
-
-        //  设置日期和星期和地理位置
-//        setBasicInfo();
-        //  刷新完之后要停止srl的刷新图标
-//        Log.i(TAG, "updateWeather: "+nowWeather.toString());
-
-//        refreshSrl.setRefreshing(false);
-
-        //  存储信息
-//        setWeatherInfo();
-
-//        Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
-
     }
 
+    //  更新日期，星期，地理位置的UI内容
     private void setBasicInfo(){
-        dateTv.setText(getFormatDate());
-        weekdayTv.setText(getWeekday());
+        dateTv.setText(Utility.getFormatDate());
+        weekdayTv.setText(Utility.getWeekday());
         locationTv.setText(currentCity+" · "+currentCounty);
     }
 
+    //  更新实况天气的UI内容
     private void setNowWeatherInfo(NowWeather nowWeather){
         tempNowTv.setText(nowWeather.getTemp()+"℃");
         weatherNowTv.setText(nowWeather.getCondTxt());
-
-        String imgName = "ic_weather_"+nowWeather.getCondCode();
-        int resId = getResIdByWeatherCode(imgName);
-
-        weatherIv.setImageResource(resId);
+        weatherIv.setImageResource(Utility.getResIdByWeatherCode(nowWeather.getCondCode(),
+                MainActivity.this));
     }
 
+    //  更新日常天气的UI内容
     private void setDailyWeatherInfo(DailyWeather dailyWeather){
         tempTv.setText(dailyWeather.getTemp());
         tempTv.setTextColor(Color.WHITE);
@@ -336,197 +313,143 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-    //  停止自动更新服务
-    @Override
-    protected void onDestroy() {
-        stopService(new Intent(MainActivity.this, UpdateWeatherService.class));
-        super.onDestroy();
-    }
-
-    //  通过SDK读取即时天气
-    private void requestWeatherNowBySDK(String cityId){
-
-        /**
-         * 实况天气
-         * 实况天气即为当前时间点的天气状况以及温湿风压等气象指数，具体包含的数据：体感温度、
-         * 实测温度、天气状况、风力、风速、风向、相对湿度、大气压强、降水量、能见度等。
-         * @param context  上下文
-         * @param location 地址详解
-         * @param lang       多语言，默认为简体中文
-         * @param unit        单位选择，公制（m）或英制（i），默认为公制单位
-         * @param listener  网络访问回调接口
-         */
-        HeWeather.getWeatherNow(MainActivity.this, cityId, Lang.CHINESE_SIMPLIFIED,
-                Unit.METRIC, new HeWeather.OnResultWeatherNowBeanListener() {
-
-            public static final String TAG = "WeatherNow";
-                    @Override
-                    public void onError(Throwable throwable) {
-                        Log.v(TAG, "on Error: ", throwable);
-                        System.out.println("Weather Now Error: "+new Gson());
-                    }
-
-
-                    @Override
-                    public void onSuccess(Now dataObject) {
-                        Log.v(TAG, "Weather Now Success: "+new Gson().toJson(dataObject));
-
-//                        String jsonData = new Gson().toJson(dataObject);
-                        String weather = null;
-                        String temp = null;
-                        String weatherCode = null;
-//                        String loc = dataObject.getUpdate().getLoc();
-                        int resId;
-                        if(dataObject.getStatus().equals("ok")){
-
-                            NowBase now = dataObject.getNow();
-
-
-                            weatherCode = now.getCond_code();
-                            weather = now.getCond_txt();
-                            temp = now.getTmp();
-
-                            //  通过天气代码找到资源文件
-                            String imgName = "ic_weather_"+weatherCode;
-                            resId = getResIdByWeatherCode(imgName);
-//                            Log.d(TAG, "onSuccess :"+resId);
-
-//                            String jsonNow = new Gson().toJson(dataObject.getNow());
-//                            JSONObject jsonObject = null;
-//                            try {
-//                                jsonObject = new JSONObject(jsonNow);
+//    private void updateTime() {
+//        Date date = new Date();
 //
-//                                //  读取即时天气
-//                                weather = jsonObject.getString("cond_txt");
-//                                //  读取即时温度
-//                                temp = jsonObject.getString("tmp");
-//                            } catch (JSONException e){
-//                                e.printStackTrace();
-//                            }
-                        } else {
-                            Toast.makeText(MainActivity.this, "读取天气数据不存在", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        tempNowTv.setText(temp+"°C");
-                        weatherNowTv.setText(weather);
-                        weatherIv.setImageResource(resId);
-//                        testTv.setText(loc);
-                    }
-                });
+//        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd");
+//        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+//
+//        String dateStr = dateFormat.format(date);
+//        String timeStr = timeFormat.format(date);
+//
+//        testTv.setText(timeStr);//显示出时间
+//    }
 
-    }
-
-    //  通过SDK读取近日天气
-    private void requestWeatherDailyBySDK(String cityId){
-
-
-        HeWeather.getWeatherForecast(MainActivity.this, cityId, Lang.CHINESE_SIMPLIFIED,
-                Unit.METRIC, new HeWeather.OnResultWeatherForecastBeanListener() {
-
-            public static final String TAG = "WeatherDaily";
-                    @Override
-                    public void onError(Throwable throwable) {
-                        Log.v(TAG, "on Error: ", throwable);
-                        System.out.println("Weather Daily Error: "+new Gson());
-                    }
-
-                    @Override
-                    public void onSuccess(Forecast dataObject) {
-                        Log.v(TAG, "Weather Now Success: "+new Gson().toJson(dataObject));
-                        String date, weather, temp, wind = null;
-                        if(dataObject.getStatus().equals("ok")){
-                            //  mini版本，只读取当日天气，近一周的天气信息后续再补充
-                            ForecastBase today = dataObject.getDaily_forecast().get(0);
-
-                            //  查看一下更新时间
-                            String loc = dataObject.getUpdate().getLoc();
-//                            testTv.setText(loc);
-
-                            //  后续应该补充白天和晚上的区别
-                            weather = today.getCond_txt_d();
-
-                            date = today.getDate();
-                            String max = today.getTmp_max();
-                            String min = today.getTmp_min();
-                            temp = min+"~"+max+"℃";
-
-                            String windDir = today.getWind_dir();
-                            String windSc = today.getWind_sc();
-                            wind = windDir+""+windSc+"级";
-                        } else {
-                            Toast.makeText(MainActivity.this, "读取天气数据不存在", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        tempTv.setText(temp);
-                        tempTv.setTextColor(Color.WHITE);
-                        weatherTv.setText(weather);
-                        weatherTv.setTextColor(Color.WHITE);
-                        windTv.setText(wind);
-                        windTv.setTextColor(Color.WHITE);
-//                        dateTv.setText(date);
-
-                    }
-                });
-    }
-
-
-    //  设置天气图标
-    private int getResIdByWeatherCode(String imgName){
-        int resId = getResources().
-                getIdentifier(imgName, "drawable", "com.example.myapplication");
-        return resId;
-    }
-
-
-    //  设置日期
-    private String getFormatDate(){
-        SimpleDateFormat simpleDateFormat= new SimpleDateFormat("MM/dd\nyyyy");
-        Date date = new Date(System.currentTimeMillis());
-        return simpleDateFormat.format(date);
-    }
-
-    //  设置星期
-    private String getWeekday(){
-        Calendar calendar = Calendar.getInstance();
-        int week = calendar.get(Calendar.DAY_OF_WEEK);
-        return convertNumToWeekday(week);
-
-    }
-
-    private String convertNumToWeekday(int week){
-        switch (week){
-            case 1:
-                return "Sun.";
-            case 2:
-                return "Mon.";
-            case 3:
-                return "Tues.";
-            case 4:
-                return "Wed.";
-            case 5:
-                return "Thus.";
-            case 6:
-                return "Fri.";
-            case 7:
-                return "Sat.";
-            default:
-                Log.d(TAG, "convertNumToWeekday:week input error!");
-                return null;
-        }
-        
-    }
-
-    private void updateTime() {
-        Date date = new Date();
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MM-dd");
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-
-        String dateStr = dateFormat.format(date);
-        String timeStr = timeFormat.format(date);
-
-        testTv.setText(timeStr);//显示出时间
-    }
+//    //  通过SDK读取即时天气
+//    private void requestWeatherNowBySDK(String cityId){
+//
+//        /**
+//         * 实况天气
+//         * 实况天气即为当前时间点的天气状况以及温湿风压等气象指数，具体包含的数据：体感温度、
+//         * 实测温度、天气状况、风力、风速、风向、相对湿度、大气压强、降水量、能见度等。
+//         * @param context  上下文
+//         * @param location 地址详解
+//         * @param lang       多语言，默认为简体中文
+//         * @param unit        单位选择，公制（m）或英制（i），默认为公制单位
+//         * @param listener  网络访问回调接口
+//         */
+//        HeWeather.getWeatherNow(MainActivity.this, cityId, Lang.CHINESE_SIMPLIFIED,
+//                Unit.METRIC, new HeWeather.OnResultWeatherNowBeanListener() {
+//
+//                    public static final String TAG = "WeatherNow";
+//                    @Override
+//                    public void onError(Throwable throwable) {
+//                        Log.v(TAG, "on Error: ", throwable);
+//                        System.out.println("Weather Now Error: "+new Gson());
+//                    }
+//
+//
+//                    @Override
+//                    public void onSuccess(Now dataObject) {
+//                        Log.v(TAG, "Weather Now Success: "+new Gson().toJson(dataObject));
+//
+////                        String jsonData = new Gson().toJson(dataObject);
+//                        String weather = null;
+//                        String temp = null;
+//                        String weatherCode = null;
+////                        String loc = dataObject.getUpdate().getLoc();
+//                        int resId;
+//                        if(dataObject.getStatus().equals("ok")){
+//
+//                            NowBase now = dataObject.getNow();
+//
+//
+//                            weatherCode = now.getCond_code();
+//                            weather = now.getCond_txt();
+//                            temp = now.getTmp();
+//
+//                            //  通过天气代码找到资源文件
+//                            String imgName = "ic_weather_"+weatherCode;
+//                            resId = getResIdByWeatherCode(imgName);
+////                            Log.d(TAG, "onSuccess :"+resId);
+//
+////                            String jsonNow = new Gson().toJson(dataObject.getNow());
+////                            JSONObject jsonObject = null;
+////                            try {
+////                                jsonObject = new JSONObject(jsonNow);
+////
+////                                //  读取即时天气
+////                                weather = jsonObject.getString("cond_txt");
+////                                //  读取即时温度
+////                                temp = jsonObject.getString("tmp");
+////                            } catch (JSONException e){
+////                                e.printStackTrace();
+////                            }
+//                        } else {
+//                            Toast.makeText(MainActivity.this, "读取天气数据不存在", Toast.LENGTH_LONG).show();
+//                            return;
+//                        }
+//                        tempNowTv.setText(temp+"°C");
+//                        weatherNowTv.setText(weather);
+//                        weatherIv.setImageResource(resId);
+////                        testTv.setText(loc);
+//                    }
+//                });
+//
+//    }
+//
+//    //  通过SDK读取近日天气
+//    private void requestWeatherDailyBySDK(String cityId){
+//
+//
+//        HeWeather.getWeatherForecast(MainActivity.this, cityId, Lang.CHINESE_SIMPLIFIED,
+//                Unit.METRIC, new HeWeather.OnResultWeatherForecastBeanListener() {
+//
+//                    public static final String TAG = "WeatherDaily";
+//                    @Override
+//                    public void onError(Throwable throwable) {
+//                        Log.v(TAG, "on Error: ", throwable);
+//                        System.out.println("Weather Daily Error: "+new Gson());
+//                    }
+//
+//                    @Override
+//                    public void onSuccess(Forecast dataObject) {
+//                        Log.v(TAG, "Weather Now Success: "+new Gson().toJson(dataObject));
+//                        String date, weather, temp, wind = null;
+//                        if(dataObject.getStatus().equals("ok")){
+//                            //  mini版本，只读取当日天气，近一周的天气信息后续再补充
+//                            ForecastBase today = dataObject.getDaily_forecast().get(0);
+//
+//                            //  查看一下更新时间
+//                            String loc = dataObject.getUpdate().getLoc();
+////                            testTv.setText(loc);
+//
+//                            //  后续应该补充白天和晚上的区别
+//                            weather = today.getCond_txt_d();
+//
+//                            date = today.getDate();
+//                            String max = today.getTmp_max();
+//                            String min = today.getTmp_min();
+//                            temp = min+"~"+max+"℃";
+//
+//                            String windDir = today.getWind_dir();
+//                            String windSc = today.getWind_sc();
+//                            wind = windDir+""+windSc+"级";
+//                        } else {
+//                            Toast.makeText(MainActivity.this, "读取天气数据不存在", Toast.LENGTH_LONG).show();
+//                            return;
+//                        }
+//                        tempTv.setText(temp);
+//                        tempTv.setTextColor(Color.WHITE);
+//                        weatherTv.setText(weather);
+//                        weatherTv.setTextColor(Color.WHITE);
+//                        windTv.setText(wind);
+//                        windTv.setTextColor(Color.WHITE);
+////                        dateTv.setText(date);
+//
+//                    }
+//                });
+//    }
 
     //  接受活动的返回消息
 

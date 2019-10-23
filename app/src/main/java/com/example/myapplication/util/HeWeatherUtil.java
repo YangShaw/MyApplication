@@ -32,25 +32,16 @@ public class HeWeatherUtil {
         HeConfig.switchToFreeServerNode();
     }
 
-    public static void requestWeather(final Context context, String cityId, final Handler handler){
-        requestWeatherNowBySDK(context, cityId, handler);
-        requestWeatherDailyBySDK(context, cityId, handler);
+    public static void requestWeather(final Context context, String cityId,
+                                      final Handler handler, final int[] messageSymbols){
+
+        requestWeatherNowBySDK(context, cityId, handler, messageSymbols[0]);
+        requestWeatherDailyBySDK(context, cityId, handler, messageSymbols[1]);
     }
 
     //  通过SDK读取即时天气
-    public static void requestWeatherNowBySDK(final Context context, String cityId, final Handler handler){
-
-        /**
-         * 实况天气
-         * 实况天气即为当前时间点的天气状况以及温湿风压等气象指数，具体包含的数据：体感温度、
-         * 实测温度、天气状况、风力、风速、风向、相对湿度、大气压强、降水量、能见度等。
-         * @param context  上下文
-         * @param location 地址详解
-         * @param lang       多语言，默认为简体中文
-         * @param unit        单位选择，公制（m）或英制（i），默认为公制单位
-         * @param listener  网络访问回调接口
-         */
-
+    public static void requestWeatherNowBySDK(final Context context, String cityId,
+                                              final Handler handler, final int messageSymbol){
 
         HeWeather.getWeatherNow(context, cityId, Lang.CHINESE_SIMPLIFIED,
                 Unit.METRIC, new HeWeather.OnResultWeatherNowBeanListener() {
@@ -83,7 +74,7 @@ public class HeWeatherUtil {
                             //  通过Message和Handler来传递信息
                             Message message = handler.obtainMessage();
                             message.obj = nowWeather;
-                            message.what = 1;
+                            message.what = messageSymbol;
                             handler.sendMessage(message);
 
                         } else {
@@ -92,11 +83,11 @@ public class HeWeatherUtil {
                         }
                     }
                 });
-//        return nowWeather;
     }
 
     //  通过SDK读取近日天气
-    public static void requestWeatherDailyBySDK(final Context context, String cityId, final Handler handler){
+    public static void requestWeatherDailyBySDK(final Context context, String cityId,
+                                                final Handler handler, final int messageSymbol){
 
         HeWeather.getWeatherForecast(context, cityId, Lang.CHINESE_SIMPLIFIED,
                 Unit.METRIC, new HeWeather.OnResultWeatherForecastBeanListener() {
@@ -129,14 +120,13 @@ public class HeWeatherUtil {
                             //  后续应该补充白天和晚上的区别
                             Message message = handler.obtainMessage();
                             message.obj = dailyWeather;
-                            message.what = 2;
+                            message.what = messageSymbol;
                             handler.sendMessage(message);
 
                         } else {
                             Toast.makeText(context, "读取天气数据不存在", Toast.LENGTH_LONG).show();
                             return;
                         }
-
                     }
                 });
     }
