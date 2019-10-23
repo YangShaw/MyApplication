@@ -6,6 +6,7 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,6 +15,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
@@ -25,9 +28,12 @@ import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.BDLocationListener;
 import com.baidu.location.LocationClient;
+import com.example.myapplication.model.DailyWeather;
+import com.example.myapplication.model.NowWeather;
 import com.example.myapplication.model.Weather;
 import com.example.myapplication.service.UpdateTimeService;
 import com.example.myapplication.service.UpdateWeatherService;
+import com.example.myapplication.util.HeWeatherUtil;
 import com.example.myapplication.util.HttpUtil;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
@@ -37,6 +43,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -184,7 +191,8 @@ public class MainActivity extends AppCompatActivity {
     public class MyTimeBroadCast extends BroadcastReceiver{
         @Override
         public void onReceive(Context context, Intent intent) {
-            requestWeatherNowBySDK(currentWeatherId);
+            updateWeather(currentWeatherId);
+//            requestWeatherNowBySDK(currentWeatherId);
         }
     }
 
@@ -232,40 +240,72 @@ public class MainActivity extends AppCompatActivity {
         });
 
         refreshFab = findViewById(R.id.fab_demo_refresh);
-//        refreshFab.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//
-//                citiesDL.openDrawer(GravityCompat.START);
-////                updateWeather(DEF_WEATHERID);
-////                updateTime();
-//
-////                String data = "weather today";
-////                int count = 0;
-////                Intent intent = new Intent(MainActivity.this, TestActivity.class);
-////                intent.putExtra("count", data);
-////                startActivityForResult(intent, 1);
-//
-//            }
-//        });
-
-
     }
 
-    public void updateWeather(String cityId){
+    public static final int UPDATE_NOW = 1;
+    public static final int UPDATE_DAILY = 2;
+
+
+    //  接收消息
+    private Handler handler = new Handler(){
+        public void handleMessage(Message msg){
+            super.handleMessage(msg);
+            switch (msg.what){
+                case UPDATE_NOW:
+                    if(msg.obj!=null){
+                        NowWeather nowInfo = (NowWeather)msg.obj;
+                        Log.i(TAG, "handleMessage: received UPDATE_NOW");
+//                        Log.i(TAG, "handleMessage: "+nowInfo.toString());
+                        setNowWeatherInfo(nowInfo);
+                    }
+                    break;
+                case UPDATE_DAILY:
+                    if(msg.obj!=null){
+                        DailyWeather dailyInfo = (DailyWeather)msg.obj;
+                        Log.i(TAG, "handleMessage: received UPDATE_DAILY");
+                        setDailyWeatherInfo(dailyInfo);
+                    }
+                    default:
+                        //  设置日期和星期和地理位置
+                        setBasicInfo();
+                        //  刷新完之后要停止srl的刷新图标
+                        refreshSrl.setRefreshing(false);
+                        //  存储信息
+                        setWeatherInfo();
+                        Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
+                        break;
+            }
+        }
+    };
+
+    public void updateWeather(final String cityId){
+        Log.i(TAG, "updateWeather: update starting");
         //  获取即时天气
-        requestWeatherNowBySDK(cityId);
-        //  获取近期天气
-        requestWeatherDailyBySDK(cityId);
+//        requestWeatherNowBySDK(cityId);
+        final String queryId = cityId;
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HeWeatherUtil.requestWeather(MainActivity.this, cityId, handler);
+            }
+        }).start();
+
+//        setNowWeatherInfo(nowWeather);
+//        //  获取近期天气
+//        requestWeatherDailyBySDK(cityId);
+
         //  设置日期和星期和地理位置
-        setBasicInfo();
+//        setBasicInfo();
         //  刷新完之后要停止srl的刷新图标
-        refreshSrl.setRefreshing(false);
+//        Log.i(TAG, "updateWeather: "+nowWeather.toString());
+
+//        refreshSrl.setRefreshing(false);
 
         //  存储信息
-        setWeatherInfo();
+//        setWeatherInfo();
 
-        Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
+//        Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
 
     }
 
@@ -273,6 +313,25 @@ public class MainActivity extends AppCompatActivity {
         dateTv.setText(getFormatDate());
         weekdayTv.setText(getWeekday());
         locationTv.setText(currentCity+" · "+currentCounty);
+    }
+
+    private void setNowWeatherInfo(NowWeather nowWeather){
+        tempNowTv.setText(nowWeather.getTemp()+"℃");
+        weatherNowTv.setText(nowWeather.getCondTxt());
+
+        String imgName = "ic_weather_"+nowWeather.getCondCode();
+        int resId = getResIdByWeatherCode(imgName);
+
+        weatherIv.setImageResource(resId);
+    }
+
+    private void setDailyWeatherInfo(DailyWeather dailyWeather){
+        tempTv.setText(dailyWeather.getTemp());
+        tempTv.setTextColor(Color.WHITE);
+        weatherTv.setText(dailyWeather.getCondTxtD());
+        weatherTv.setTextColor(Color.WHITE);
+        windTv.setText(dailyWeather.getWind());
+        windTv.setTextColor(Color.WHITE);
     }
 
 

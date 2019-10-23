@@ -2,6 +2,8 @@ package com.example.myapplication.util;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -23,8 +25,6 @@ import interfaces.heweather.com.interfacesmodule.view.HeWeather;
 
 public class HeWeatherUtil {
 
-    public static NowWeather nowWeather;
-    public static DailyWeather dailyWeather;
     public static void heWeatherInit(){
         //  和风天气api初始化
         HeConfig.init("HE1909200100361711", "69f2cb642a1646379bdb680390c377c7");
@@ -32,8 +32,13 @@ public class HeWeatherUtil {
         HeConfig.switchToFreeServerNode();
     }
 
+    public static void requestWeather(final Context context, String cityId, final Handler handler){
+        requestWeatherNowBySDK(context, cityId, handler);
+        requestWeatherDailyBySDK(context, cityId, handler);
+    }
+
     //  通过SDK读取即时天气
-    private NowWeather requestWeatherNowBySDK(final Context context, String cityId){
+    public static void requestWeatherNowBySDK(final Context context, String cityId, final Handler handler){
 
         /**
          * 实况天气
@@ -46,7 +51,6 @@ public class HeWeatherUtil {
          * @param listener  网络访问回调接口
          */
 
-        nowWeather = new NowWeather();
 
         HeWeather.getWeatherNow(context, cityId, Lang.CHINESE_SIMPLIFIED,
                 Unit.METRIC, new HeWeather.OnResultWeatherNowBeanListener() {
@@ -65,12 +69,22 @@ public class HeWeatherUtil {
                             NowBase now = dataObject.getNow();
                             Update update = dataObject.getUpdate();
 
+                            NowWeather nowWeather = new NowWeather();
+
                             nowWeather.setCondCode(now.getCond_code());
                             nowWeather.setCondTxt(now.getCond_txt());
                             nowWeather.setTemp(now.getTmp());
 
                             //  获取更新时间
                             nowWeather.setLoc(update.getLoc());
+                            Log.i(TAG, "onSuccess: "+nowWeather.getCondCode());
+                            Log.i(TAG, "onSuccess: "+nowWeather.getTemp());
+
+                            //  通过Message和Handler来传递信息
+                            Message message = handler.obtainMessage();
+                            message.obj = nowWeather;
+                            message.what = 1;
+                            handler.sendMessage(message);
 
                         } else {
                             Toast.makeText(context, "读取天气数据不存在", Toast.LENGTH_LONG).show();
@@ -78,13 +92,12 @@ public class HeWeatherUtil {
                         }
                     }
                 });
-        return nowWeather;
+//        return nowWeather;
     }
 
     //  通过SDK读取近日天气
-    private DailyWeather requestWeatherDailyBySDK(final Context context, String cityId){
+    public static void requestWeatherDailyBySDK(final Context context, String cityId, final Handler handler){
 
-        dailyWeather = new DailyWeather();
         HeWeather.getWeatherForecast(context, cityId, Lang.CHINESE_SIMPLIFIED,
                 Unit.METRIC, new HeWeather.OnResultWeatherForecastBeanListener() {
 
@@ -101,6 +114,7 @@ public class HeWeatherUtil {
                         if(dataObject.getStatus().equals("ok")){
                             //  mini版本，只读取当日天气，近一周的天气信息后续再补充
                             ForecastBase today = dataObject.getDaily_forecast().get(0);
+                            DailyWeather dailyWeather = new DailyWeather();
 
                             dailyWeather.setCondTxtD(today.getCond_txt_d());
                             dailyWeather.setCondCodeD(today.getCond_code_d());
@@ -113,6 +127,10 @@ public class HeWeatherUtil {
                             dailyWeather.generateWind();
 
                             //  后续应该补充白天和晚上的区别
+                            Message message = handler.obtainMessage();
+                            message.obj = dailyWeather;
+                            message.what = 2;
+                            handler.sendMessage(message);
 
                         } else {
                             Toast.makeText(context, "读取天气数据不存在", Toast.LENGTH_LONG).show();
@@ -121,6 +139,5 @@ public class HeWeatherUtil {
 
                     }
                 });
-        return dailyWeather;
     }
 }

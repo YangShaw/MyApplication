@@ -14,6 +14,15 @@ public class DailyWeather {
     private String windSc;
 
     private String wind;    //  生成属性
+
+    public String getWind() {
+        return wind;
+    }
+
+    public String getTemp() {
+        return temp;
+    }
+
     private String temp;    //  生成属性
 
 

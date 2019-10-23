@@ -20,6 +20,15 @@ public class NowWeather {
         this.loc = loc;
     }
 
+    @Override
+    public String toString() {
+        return "NowWeather{" +
+                "condCode='" + condCode + '\'' +
+                ", condTxt='" + condTxt + '\'' +
+                ", temp='" + temp + '\'' +
+                ", loc='" + loc + '\'' +
+                '}';
+    }
 
     public String getCondCode() {
         return condCode;
