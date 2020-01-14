@@ -1,23 +1,21 @@
-package com.example.myapplication;
+package com.example.myapplication.activity;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -26,43 +24,33 @@ import android.widget.Toast;
 
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
-import com.baidu.location.BDLocationListener;
 import com.baidu.location.LocationClient;
+import com.example.myapplication.R;
+import com.example.myapplication.adapter.ListRcvAdapter;
+import com.example.myapplication.gson.Forecast;
 import com.example.myapplication.model.DailyWeather;
 import com.example.myapplication.model.NowWeather;
-import com.example.myapplication.model.Weather;
 import com.example.myapplication.service.UpdateTimeService;
 import com.example.myapplication.service.UpdateWeatherService;
 import com.example.myapplication.util.HeWeatherUtil;
 import com.example.myapplication.util.HttpUtil;
+import com.example.myapplication.util.StatusCodeUtil;
 import com.example.myapplication.util.Utility;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.gson.Gson;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
+import java.util.ArrayList;
+import java.util.List;
 
-import interfaces.heweather.com.interfacesmodule.bean.Lang;
-import interfaces.heweather.com.interfacesmodule.bean.Unit;
-import interfaces.heweather.com.interfacesmodule.bean.weather.forecast.Forecast;
-import interfaces.heweather.com.interfacesmodule.bean.weather.forecast.ForecastBase;
-import interfaces.heweather.com.interfacesmodule.bean.weather.now.Now;
-import interfaces.heweather.com.interfacesmodule.bean.weather.now.NowBase;
-import interfaces.heweather.com.interfacesmodule.view.HeConfig;
-import interfaces.heweather.com.interfacesmodule.view.HeWeather;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.Response;
 
-import interfaces.heweather.com.interfacesmodule.*;
-import okhttp3.internal.Util;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -82,14 +70,16 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageView weatherIv;
 
-    private TextView testTv;
+    private RecyclerView forecastRv;
+
+    ListRcvAdapter adapter;
+    List<Forecast> infoList = new ArrayList<>();
+
 
 //    private FloatingActionButton refreshFab;
-
 //    private Weather myWeather;
 
-
-    private final String KEY = "69f2cb642a1646379bdb680390c377c7";  //  访问天气API的key
+    private final String KEY = "cc33b9a52d6e48de852477798980b76e";  //  访问天气API的key
     private final String DEF_WEATHERID = "CN101011100"; //  大兴区的id
     private final String DEF_CITY = "北京";
     private final String DEF_COUNTY = "大兴";
@@ -122,8 +112,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_demo);
 
-        //  打印日志的功能，必须学会习惯使用
-        //  在Logcat栏显示，可以通过筛选重要级别和关键字（例如类名以分类）来查看
         Log.i(TAG,"onCreate execute");
 
         //  和风天气初始化
@@ -135,8 +123,10 @@ public class MainActivity extends AppCompatActivity {
         //  启动自动更新服务
         startTimeService();
 
+
+
         //  baiduAPI
-//        mLocationClient = new LocationClient(getApplicationContext());
+//        cationClient = new LocationClient(getApplicationContext());
 //        mLocationClient.registerLocationListener(new MyLocationListener());
 //        requestLocation();
     }
@@ -147,10 +137,15 @@ public class MainActivity extends AppCompatActivity {
 
         //  读取上一次存储的城市信息
         getWeatherInfo();
-        Log.i(TAG, "onCreate: currentcounty is "+currentCounty);
+        Log.i(TAG, "onStart: currentcounty is "+currentCounty);
 
         //  更新天气信息
         updateWeather(currentWeatherId);
+
+        Log.i(TAG, "onStart: "+currentWeatherId);
+        dataInit(currentWeatherId);
+
+        initRecycleView();
         super.onStart();
     }
 
@@ -160,7 +155,6 @@ public class MainActivity extends AppCompatActivity {
         stopService(new Intent(MainActivity.this, UpdateWeatherService.class));
         super.onDestroy();
     }
-
 
     private void startTimeService(){
         timeService = new Intent(this, UpdateTimeService.class);
@@ -180,8 +174,9 @@ public class MainActivity extends AppCompatActivity {
         currentWeatherId = pref.getString("last_weather_id", DEF_WEATHERID);
         currentCity = pref.getString("last_city", DEF_CITY);
         currentCounty = pref.getString("last_county", DEF_COUNTY);
-        Log.i(TAG, "getWeatherInfo: 读取成功");
 
+        Log.i(TAG, "getWeatherInfo: 读取成功");
+        Log.i(TAG, "getWeatherInfo: "+currentWeatherId);
     }
 
     private void setWeatherInfo(){
@@ -191,11 +186,8 @@ public class MainActivity extends AppCompatActivity {
         editor.putString("last_city", currentCity);
         editor.putString("last_county", currentCounty);
         editor.apply();
-//        editor.commit();
         Log.i(TAG, "setWeatherInfo: 存储成功");
     }
-
-
 
     //  每30分接收一次广播，进行一次天气更新。
     public class MyTimeBroadCast extends BroadcastReceiver{
@@ -210,7 +202,6 @@ public class MainActivity extends AppCompatActivity {
         locationTv = findViewById(R.id.tv_demo_location);
 
         weekdayTv = findViewById(R.id.tv_demo_weekday);
-        testTv = findViewById(R.id.tv_demo_test);
 
         tempNowTv = findViewById(R.id.tv_demo_temperature_realtime);
         weatherNowTv = findViewById(R.id.tv_demo_weather_realtime);
@@ -229,6 +220,12 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        forecastRv = findViewById(R.id.rv_demo_forecast);
+
+
+
+
+
         //  给显示地理信息的控件添加点击事件
         locationTv.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -238,6 +235,61 @@ public class MainActivity extends AppCompatActivity {
         });
 
 //        refreshFab = findViewById(R.id.fab_demo_refresh);
+    }
+
+    private void dataInit(String cityId){
+        //  通过api获取近日天气
+        String address = "https://free-api.heweather.net/s6/weather/forecast?location="+cityId+"&key=cc33b9a52d6e48de852477798980b76e";
+
+        Log.i(TAG, "dataInit: "+address);
+
+        HttpUtil.getOkHttpRequest(address, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseBody = response.body().string();
+                Log.i(TAG, "onResponse: " + responseBody);
+                JsonObject jsonObject =(JsonObject)new JsonParser().parse(responseBody);
+                JsonArray jsonArray = jsonObject.get("HeWeather6").getAsJsonArray();
+                JsonObject weatherContent = jsonArray.get(0).getAsJsonObject();
+
+                JsonArray forecastInfo = weatherContent.get("daily_forecast").getAsJsonArray();
+
+                infoList.clear();
+                for(JsonElement everyday : forecastInfo){
+                    JsonObject cur =everyday.getAsJsonObject();
+                    Forecast forecast = new Forecast();
+                    forecast.date = cur.get("date").getAsString();
+                    forecast.max = cur.get("tmp_max").getAsString();
+                    forecast.min = cur.get("tmp_min").getAsString();
+                    forecast.code = cur.get("cond_code_d").getAsString();
+                    Log.i(TAG, "onResponse: "+forecast);
+                    infoList.add(forecast);
+                }
+
+            }
+        });
+
+    }
+
+
+
+    private void initRecycleView() {
+        //  定义一个线性布局管理器
+        LinearLayoutManager manager = new LinearLayoutManager(MainActivity.this);
+        manager.setOrientation(LinearLayoutManager.HORIZONTAL);
+        //  将管理器配置给recyclerView
+        forecastRv.setLayoutManager(manager);
+        //  设置adapter
+        adapter = new ListRcvAdapter(MainActivity.this, infoList);
+        //  添加adapter
+        forecastRv.setAdapter(adapter);
+        //  添加动画
+        forecastRv.setItemAnimator(new DefaultItemAnimator());
     }
 
     //  接收消息
@@ -265,6 +317,9 @@ public class MainActivity extends AppCompatActivity {
                         refreshSrl.setRefreshing(false);
                         //  存储信息
                         setWeatherInfo();
+                        Log.i(TAG, "handleMessage: 进行了天气的更新");
+                        dataInit(currentWeatherId);
+                        adapter.notifyDataSetChanged();
                         Toast.makeText(MainActivity.this, "实况天气已更新", Toast.LENGTH_SHORT).show();
                         break;
             }
@@ -481,7 +536,6 @@ public class MainActivity extends AppCompatActivity {
                 //  网络定位
                 currentPosition.append("网络");
             }
-            testTv.setText(currentPosition);
         }
     }
 

@@ -1,14 +1,11 @@
 package com.example.myapplication.util;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.example.myapplication.MainActivity;
-import com.example.myapplication.gson.Basic;
 import com.example.myapplication.model.DailyWeather;
 import com.example.myapplication.model.NowWeather;
 import com.google.gson.Gson;
@@ -24,10 +21,14 @@ import interfaces.heweather.com.interfacesmodule.view.HeConfig;
 import interfaces.heweather.com.interfacesmodule.view.HeWeather;
 
 public class HeWeatherUtil {
+    private static final String TAG = "HeWeatherUtil";
 
     public static void heWeatherInit(){
         //  和风天气api初始化
-        HeConfig.init("HE1909200100361711", "69f2cb642a1646379bdb680390c377c7");
+        Log.i(TAG, "heWeatherInit: 正在初始化");
+//        HeConfig.init("HE1901311309381615", "d2ae781d61744d65a2ef2156eef2cb64");
+        HeConfig.init("HE2001130052131565", "967ae624f31d45ed90f991feb063cba3");
+
         //  免费接口要转换成免费节点
         HeConfig.switchToFreeServerNode();
     }
@@ -130,4 +131,7 @@ public class HeWeatherUtil {
                     }
                 });
     }
+
+    //  通过api获取近日天气
+
 }

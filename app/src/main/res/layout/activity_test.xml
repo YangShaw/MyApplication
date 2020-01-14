@@ -4,11 +4,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".TestActivity">
+    tools:context=".activity.TestActivity">
 
     <fragment
         android:id="@+id/fragment_choose_area"
-        android:name="com.example.myapplication.ChooseAreaFragment"
+        android:name="com.example.myapplication.fragment.ChooseAreaFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
